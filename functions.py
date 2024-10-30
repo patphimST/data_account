@@ -632,7 +632,7 @@ def envoi_email(status,error):
     sender_email = 'ope@supertripper.com'
     sender_name = 'Supertripper Reports'
     recipient_email = "ope@supertripper.com"
-    subject = f'CONSO BILLS : CRON {status}'
+    subject = f'CRON CONSO BILLS {status}'
 
     # Construction du corps de l'e-mail
     body = (
