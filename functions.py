@@ -23,7 +23,6 @@ api_pipedrive = os.getenv('api_pipedrive')
 client = MongoClient( f'mongodb+srv://{mongo_pat}',tls=True,tlsAllowInvalidCertificates=True)
 
 def get_conso():
-    print("########### GET CONSO START ###########")
 
     result = client['legacy-api-management']['bills'].aggregate([
         {
@@ -32,7 +31,7 @@ def get_conso():
                     '$in': ['receipt', 'credit', 'unitary']
                 },
                 'createdAt': {
-                    '$gte': datetime(2021, 10, 1, 0, 0, 0, tzinfo=timezone.utc)
+                    '$gte': datetime(2024, 10, 1, 0, 0, 0, tzinfo=timezone.utc)
                 }
             }
         },
@@ -156,14 +155,11 @@ def get_conso():
     df['range'] = df['year_month'].apply(assign_range)
 
     # Save the resulting DataFrame to CSV
-    df.to_csv("test2.csv", index=False)
+    df.to_csv(r"C:\Users\super\PycharmProjects\data_account\csv\current.csv", index=False)
 
-
-    print("########### GET CONSO END ###########")
-
-def dd():
+def conforme():
     # Recharger le fichier et ajouter les mois
-    df = pd.read_csv('test2.csv')
+    df = pd.read_csv(r'C:\Users\super\PycharmProjects\data_account\csv\current.csv')
     month_labels = {
         10: "01-octobre", 11: "02-novembre", 12: "03-décembre",
         1: "04-janvier", 2: "05-février", 3: "06-mars", 4: "07-avril",
@@ -181,11 +177,17 @@ def dd():
     # Map the month labels based on the "month" column
     grouped_df['month_labels'] = grouped_df['month'].map(month_labels)
 
-    grouped_df.to_csv('/Users/patrick/PycharmProjects/data_account/csv/conso2.csv',sep = ";",index=False)
+    grouped_df.to_csv('C:/Users/super/PycharmProjects/data_account/csv/current.csv',sep = ";",index=False)
+
+def merge_conso():
+    df_conso = pd.read_csv(r'C:\Users\super\PycharmProjects\data_account\csv\current.csv', delimiter=";")
+    df_since21 = pd.read_csv(r'C:\Users\super\PycharmProjects\data_account\csv\since21.csv', delimiter=";")
+    merged_df = pd.concat([df_since21, df_conso]).drop_duplicates(
+        subset=['raison', 'year_month', 'month', 'year', 'billingId', 'range', 'societyName', 'companyId'],
+        keep='last')
+    merged_df.to_csv(r"C:\Users\super\PycharmProjects\data_account\csv\conso.csv",sep = ";",index=False)
 
 def get_base():
-    print("########### GET BASE START ###########")
-    from pymongo import MongoClient
 
     result = client['legacy-api-management']['societies'].aggregate(
         [
@@ -243,10 +245,9 @@ def get_base():
 
     df['name'] = df['name'].str.replace('+Simple', 'Plus Simple')
     df.rename(columns={'_id': 'societyId', 'name': 'societyName'}, inplace=True)
-    df.to_csv('/Users/patrick/PycharmProjects/data_account/csv/base.csv', index=False)
+    df.to_csv('C:/Users/super/PycharmProjects/data_account/csv/base.csv', index=False)
 
 def get_portefeuille():
-    print("########### GET PORTEFEUILLE START ###########")
 
     FILTER_ID = 1514
     url = f"https://api.pipedrive.com/v1/organizations?filter_id={FILTER_ID}&limit=500&api_token={api_pipedrive}"
@@ -290,14 +291,9 @@ def get_portefeuille():
 
     df = pd.DataFrame(data)
     df = df.astype(str)
-    df.to_csv("/Users/patrick/PycharmProjects/data_account/csv/pipe_all.csv", index=False)
-
-import re
-import pandas as pd
-from pymongo import MongoClient
+    df.to_csv("C:/Users/super/PycharmProjects/data_account/csv/pipe_all.csv", index=False)
 
 def get_tarif():
-    print("########### GET TARIF START ###########")
     # Pipeline d'agrégation
     result = client['legacy-api-management']['societies'].aggregate([
         {
@@ -349,27 +345,28 @@ def get_tarif():
     df['flights'] = df['flights'].astype(str).str.replace(r"^\[|\]$", "", regex=True).replace("'", "", regex=True)
 
     df = df.fillna("").astype(str)
-    df.to_csv('/Users/patrick/PycharmProjects/data_account/csv/temp_tarif.csv', index=False)
     df['societyName'] = df['societyName'].str.upper()
+    df.to_csv('test.csv')
 
-    # Charger les autres fichiers CSV et mettre en majuscule 'societyName'
-    base_df = pd.read_csv('/Users/patrick/PycharmProjects/data_account/csv/base.csv')
+    base_df = pd.read_csv('C:/Users/super/PycharmProjects/data_account/csv/conso.csv', delimiter=";")
+    base_df = base_df.rename(columns={'companyId':"societyId"})
+
     base_df['societyName'] = base_df['societyName'].str.upper()
 
-    pipe_all_df = pd.read_csv('/Users/patrick/PycharmProjects/data_account/csv/pipe_all.csv')
+    # # Fusionner avec base_df
+    merged_df = pd.merge(df, base_df, on=["societyId", 'societyName'], how="left")
+
+    pipe_all_df = pd.read_csv('C:/Users/super/PycharmProjects/data_account/csv/pipe_all.csv')
     pipe_all_df['societyName'] = pipe_all_df['societyName'].str.upper()
 
-    # Fusionner avec base_df
-    merged_df = pd.merge(df, base_df, on=["societyId", 'societyName'], how="left")
     final_df = pd.merge(merged_df, pipe_all_df, on=["societyId"], how="left")
+
     final_df.rename(columns={'societyName_x': 'societyName'}, inplace=True)
     final_df['full'] = final_df['full'].replace('True', "Plein Credit").replace('', "-")
     final_df['company_status'] = final_df['company_status'].fillna("-").astype(str)
-    final_df.to_csv('/Users/patrick/PycharmProjects/data_account/csv/tarif.csv', index=False)
-
+    final_df.to_csv('C:/Users/super/PycharmProjects/data_account/csv/tarif.csv', index=False)
 
 def get_entities():
-    print("########### GET ENTITIES START ###########")
 
     # Agrégation initiale pour extraire les entités
     result = client['legacy-api-management']['societies'].aggregate(
@@ -415,12 +412,11 @@ def get_entities():
     df.drop(columns=['billing_id'], inplace=True)
 
     # Sauvegarder le DataFrame en CSV
-    df.to_csv('/Users/patrick/PycharmProjects/data_account/csv/entities.csv', index=False)
+    df.to_csv('C:/Users/super/PycharmProjects/data_account/csv/entities.csv', index=False)
 
     print("CSV saved successfully.")
 
 def get_entities_unactive():
-    print("########### GET UPDATEDRIVE START ###########")
 
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
@@ -488,7 +484,7 @@ def get_entities_unactive():
     SHEET_NAME_ACTIVE = 'Entities_Active'
 
     # Authentification Google Sheets
-    SERVICE_ACCOUNT_FILE = '/Users/patrick/PycharmProjects/data_account/creds/n8n-api-311609-115ae3a49fd9.json'
+    SERVICE_ACCOUNT_FILE = 'C:/Users/super/PycharmProjects/data_account/creds/n8n-api-311609-115ae3a49fd9.json'
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
     credentials = service_account.Credentials.from_service_account_file(
@@ -515,7 +511,7 @@ def get_entities_unactive():
     print(f"{result_unactive.get('updatedCells')} cellules mises à jour dans '{SHEET_NAME_UNACTIVE}'.")
 
     # Charger le fichier CSV entities.csv dans un DataFrame
-    df_entity = pd.read_csv('/Users/patrick/PycharmProjects/data_account/csv/entities.csv')
+    df_entity = pd.read_csv('C:/Users/super/PycharmProjects/data_account/csv/entities.csv')
 
     # Nettoyer les données en remplaçant les NaN par une chaîne vide
     df_entity = df_entity.fillna('')
@@ -539,33 +535,11 @@ def get_entities_unactive():
 
     print(f"{result_active.get('updatedCells')} cellules mises à jour dans '{SHEET_NAME_ACTIVE}'.")
 
-def variation():
-    df = pd.read_csv("/Users/patrick/PycharmProjects/data_account/csv/conso2.csv")
-    import numpy as np
-
-    def calculate_variation(row):
-        if row['N-1'] == 0:
-            if row['N'] == 0:
-                return 0
-            else:
-                return np.inf  # Representing an infinite increase
-        else:
-            if row['N'] == 0:
-                return -100.0
-            else:
-                return ((row['N'] - row['N-1']) / abs(row['N-1'])) * 100
-
-    # Apply the function to each row
-    df['Variation (%)'] = df.apply(calculate_variation, axis=1)
-    df['Variation (%)'] = df['Variation (%)'].round(2)
-
-    df.to_csv('/Users/patrick/PycharmProjects/data_account/csv/conso2.csv', index=False)
-
 def merge_all():
     # Load the three CSV files
-    conso_df = pd.read_csv('/Users/patrick/PycharmProjects/data_account/csv/conso2.csv', delimiter = ";",encoding='utf-8')
-    base_df = pd.read_csv('/Users/patrick/PycharmProjects/data_account/csv/base.csv')
-    pipe_all_df = pd.read_csv('/Users/patrick/PycharmProjects/data_account/csv/pipe_all.csv')
+    conso_df = pd.read_csv('C:/Users/super/PycharmProjects/data_account/csv/conso.csv', delimiter = ";",encoding='utf-8')
+    base_df = pd.read_csv('C:/Users/super/PycharmProjects/data_account/csv/base.csv')
+    pipe_all_df = pd.read_csv('C:/Users/super/PycharmProjects/data_account/csv/pipe_all.csv')
     print(conso_df)
 
     conso_df = conso_df.rename(columns={'companyId': 'societyId'})
@@ -579,22 +553,21 @@ def merge_all():
     # merged_df = merged_df[merged_df['company_status'] == 'ACTIF'].reset_index()
 
     # Save the merged result to a new CSV file
-    merged_df.to_csv('/Users/patrick/PycharmProjects/data_account/csv/merged_result2.csv',index=False)
+    merged_df.to_csv('C:/Users/super/PycharmProjects/data_account/csv/merged_result.csv',index=False)
 
     # Display the first few rows of the merged DataFrame
     merged_df.head()
 
 def update_drive():
-    print("########### GET UPDATEDRIVE START ###########")
 
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
 
     # Liste des tuples contenant les paires de (nom_fichier_csv, plage_sheet)
-    list = [('merged_result2.csv', 'conso_updated'),('tarif.csv', 'tarif_nego'),('warning.csv', 'warning'),('entities.csv', 'entities'),('entities_unactive.csv', 'entities_unactive')]
+    list = [('merged_result.csv', 'conso_updated'),('tarif.csv', 'tarif_nego'),('warning.csv', 'warning'),('entities.csv', 'entities'),('entities_unactive.csv', 'entities_unactive')]
 
     # Fichier de compte de service et les scopes de l'API
-    SERVICE_ACCOUNT_FILE = '/Users/patrick/PycharmProjects/data_account/creds/n8n-api-311609-115ae3a49fd9.json'
+    SERVICE_ACCOUNT_FILE = 'C:/Users/super/PycharmProjects/data_account/creds/n8n-api-311609-115ae3a49fd9.json'
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
     def sheet_upt(filename, sheet_range):
@@ -607,7 +580,7 @@ def update_drive():
         service = build('sheets', 'v4', credentials=credentials)
 
         # Lecture du DataFrame pivoté
-        df = pd.read_csv(f'/Users/patrick/PycharmProjects/data_account/csv/{filename}', low_memory=False)
+        df = pd.read_csv(f'C:/Users/super/PycharmProjects/data_account/csv/{filename}', low_memory=False)
         df = df.astype(str).replace('nan', '')
         # Convertir la colonne "totalAmount" en float
         if 'totalAmount' in df.columns:
@@ -665,8 +638,8 @@ def envoi_email(status,error):
     body = (
         f'{error}'
     )
-    creds_file = '/Users/patrick/PycharmProjects/data_account/creds/cred_gmail.json'
-    token_file = '/Users/patrick/PycharmProjects/data_account/token.json'
+    creds_file = 'C:/Users/super/PycharmProjects/data_account/creds/cred_gmail.json'
+    token_file = 'C:/Users/super/PycharmProjects/data_account/token.json'
     def authenticate_gmail():
         """Authentifie l'utilisateur via OAuth 2.0 et retourne les credentials"""
         creds = None
